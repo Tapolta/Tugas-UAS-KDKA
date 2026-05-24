@@ -1,0 +1,241 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="flex flex-col lg:flex-row gap-6 h-[calc(100vh-12rem)]">
+  
+  <div class="flex-1 bg-white rounded-xl border border-zinc-200 shadow-sm p-4 flex flex-col justify-between">
+    <div class="flex flex-col gap-2 border-b border-zinc-100 pb-3 mb-4">
+      <div>
+        <h2 class="font-semibold text-zinc-900">Peta Simulasi Robot</h2>
+        <p class="text-xs text-zinc-500">Klik Kiri: Gambar Sesuai Kuas | Klik Kanan: Hapus (Jalan)</p>
+      </div>
+    </div>
+
+    <button 
+      id="btnReset"
+      class="w-xs bg-white hover:bg-rose-50 text-rose-600 font-medium py-2.5 px-4 my-2 rounded-lg border border-rose-200 transition text-sm"
+    >
+      Reset Peta
+    </button>
+
+    <div class="flex-1 flex items-center justify-center bg-zinc-50 rounded-lg border border-dashed border-zinc-300 relative overflow-hidden">
+      <canvas id="simulasiCanvas" width="600" height="400" class="bg-white shadow-md rounded border border-zinc-200 cursor-crosshair"></canvas>
+    </div>
+  </div>
+
+  <div class="w-full lg:w-80 bg-white rounded-xl border border-zinc-200 shadow-sm p-5 flex flex-col justify-between">
+    <div class="space-y-6">
+      <div>
+        <h2 class="font-semibold text-zinc-900">Control Panel</h2>
+        <p class="text-xs text-zinc-500">Pengaturan jadwal perpustakaan keliling</p>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-zinc-600 uppercase tracking-wider mb-1.5">Pilih Hari</label>
+          <select id="selectHari" class="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+            <option>Senin</option><option>Selasa</option><option>Rabu</option>
+            <option>Kamis</option><option>Jumat</option><option>Sabtu</option><option>Minggu</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-600 uppercase tracking-wider mb-1.5">Pilih Jam Operasional</label>
+          <select id="selectJam" class="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+            <option>08:00 - 10:00 (Pagi)</option>
+            <option>12:00 - 14:00 (Siang/Macet)</option>
+            <option>15:00 - 17:00 (Sore)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-600 uppercase tracking-wider mb-1.5">Kuas / Navigasi</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button data-tool="7" class="tool-btn bg-zinc-900 text-white text-xs font-medium py-2 px-3 rounded-lg border border-zinc-900 shadow-sm ring-2 ring-indigo-500 ring-offset-2 flex items-center gap-2 justify-center">
+              <span class="h-2 w-2 rounded-full bg-emerald-500"></span>Titik Mulai
+            </button>
+            <button data-tool="8" class="tool-btn bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium py-2 px-3 rounded-lg border border-zinc-300 shadow-sm flex items-center gap-2 justify-center">
+              <span class="h-2 w-2 rounded-full bg-blue-500"></span>Titik Selesai
+            </button>
+          </div>
+          <div class="grid grid-cols-2 gap-2 mt-2">
+            <button data-tool="1" class="tool-btn bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium py-2 px-3 rounded-lg border border-zinc-300 shadow-sm flex items-center gap-2 justify-center">
+              <span class="h-2 w-2 rounded-full bg-zinc-900 border border-zinc-400"></span>Tembok
+            </button>
+            <button data-tool="3" class="tool-btn bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium py-2 px-3 rounded-lg border border-zinc-300 shadow-sm flex items-center gap-2 justify-center">
+              <span class="h-2 w-2 rounded-full bg-gray-500"></span>Pemberhentian
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-zinc-600 uppercase tracking-wider mb-1.5">Rintangan Dinamis</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button data-tool="2" class="tool-btn bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium py-2 px-3 rounded-lg border border-zinc-300 shadow-sm flex items-center gap-2 justify-center">
+              <span class="h-2 w-2 rounded-full bg-amber-500"></span>Pasar (Macet)
+            </button>
+            <button data-tool="4" class="tool-btn bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium py-2 px-3 rounded-lg border border-zinc-300 shadow-sm flex items-center gap-2 justify-center">
+              <span class="h-2 w-2 rounded-full bg-orange-500"></span>Ev Pagi
+            </button>
+            <button data-tool="5" class="tool-btn bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium py-2 px-3 rounded-lg border border-zinc-300 shadow-sm flex items-center gap-2 justify-center">
+              <span class="h-2 w-2 rounded-full bg-red-500"></span>Ev Siang
+            </button>
+            <button data-tool="6" class="tool-btn bg-white hover:bg-zinc-50 text-zinc-700 text-xs font-medium py-2 px-3 rounded-lg border border-zinc-300 shadow-sm flex items-center gap-2 justify-center">
+              <span class="h-2 w-2 rounded-full bg-purple-500"></span>Ev Sore
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="pt-4 border-t border-zinc-100">
+      <button id="btnSimulasi" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition flex items-center justify-center gap-2 text-sm">
+        Mulai Simulasi
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  // --- CONFIGURATIONS & CONSTANTS ---
+  const RESOLUTION = 20;
+  const ROUTE_COLOR = '#10b981'; // Emerald-500 untuk garis rute aktif
+
+  // Single-source of truth untuk IDs, warna, dan tipe ubin map
+  const TILE_CONFIG = {
+    0: { color: '#ffffff', isUnique: false }, // Jalan Kosong
+    1: { color: '#18181b', isUnique: false }, // Tembok (Zinc-900)
+    2: { color: '#f59e0b', isUnique: false }, // Pasar (Amber-500)
+    3: { color: '#6b7280', isUnique: false }, // Pemberhentian (Gray-500)
+    4: { color: '#f97316', isUnique: false }, // Event Pagi (Orange-500)
+    5: { color: '#ef4444', isUnique: false }, // Event Siang (Red-500)
+    6: { color: '#a855f7', isUnique: false }, // Event Sore (Purple-500)
+    7: { color: '#10b981', isUnique: true  }, // Titik Mulai (Emerald-500)
+    8: { color: '#3b82f6', isUnique: true  }  // Titik Selesai (Blue-500)
+  };
+
+  // --- DOM ELEMENTS ---
+  const canvas = document.getElementById('simulasiCanvas');
+  const ctx = canvas.getContext('2d');
+  const btnReset = document.getElementById('btnReset');
+  const btnSimulasi = document.getElementById('btnSimulasi');
+  const toolButtons = document.querySelectorAll('.tool-btn');
+  const selectHari = document.getElementById('selectHari');
+  const selectJam = document.getElementById('selectJam');
+
+  const COLS = canvas.width / RESOLUTION;
+  const ROWS = canvas.height / RESOLUTION;
+
+  // --- APP STATE ---
+  let grid = Array(COLS).fill(null).map(() => Array(ROWS).fill(0));
+  let currentTool = 7; // Default awal: Titik Mulai
+
+  // --- CORE FUNCTIONS ---
+
+  function drawGrid() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    for (let col = 0; col < COLS; col++) {
+      for (let row = 0; row < ROWS; row++) {
+        ctx.beginPath();
+        ctx.rect(col * RESOLUTION, row * RESOLUTION, RESOLUTION, RESOLUTION);
+        
+        const tileType = grid[col][row];
+        ctx.fillStyle = TILE_CONFIG[tileType]?.color || '#ffffff';
+        ctx.fill();
+        
+        ctx.strokeStyle = '#e4e4e7'; 
+        ctx.stroke();
+      }
+    }
+  }
+
+  function clearUniqueInstance(toolId) {
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        if (grid[c][r] === toolId) grid[c][r] = 0;
+      }
+    }
+  }
+
+  function drawRoute(rute) {
+    rute.forEach(([col, row]) => {
+      // Jangan timpa render visual Titik Mulai (7) dan Selesai (8)
+      if (grid[col][row] !== 7 && grid[col][row] !== 8) {
+        ctx.fillStyle = ROUTE_COLOR;
+        ctx.fillRect(col * RESOLUTION + 4, row * RESOLUTION + 4, RESOLUTION - 8, RESOLUTION - 8);
+      }
+    });
+  }
+
+  function handleDrawEvent(e) {
+    const rect = canvas.getBoundingClientRect();
+    const col = Math.floor((e.clientX - rect.left) / RESOLUTION);
+    const row = Math.floor((e.clientY - rect.top) / RESOLUTION);
+
+    if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
+      if (e.buttons === 1) { // Left click: Draw
+        if (TILE_CONFIG[currentTool]?.isUnique) {
+          clearUniqueInstance(currentTool);
+        }
+        grid[col][row] = currentTool;
+      } else if (e.buttons === 2) { // Right click: Erase
+        grid[col][row] = 0;
+      }
+      drawGrid();
+    }
+  }
+
+  // --- EVENT LISTENERS ---
+
+  // UI: Tool Brush Selection Toggle
+  toolButtons.forEach(button => {
+    button.addEventListener('click', () => {
+      toolButtons.forEach(btn => {
+        btn.classList.remove('bg-zinc-900', 'text-white', 'ring-2', 'ring-indigo-500', 'ring-offset-2');
+        btn.classList.add('bg-white', 'text-zinc-700');
+      });
+      button.classList.remove('bg-white', 'text-zinc-700');
+      button.classList.add('bg-zinc-900', 'text-white', 'ring-2', 'ring-indigo-500', 'ring-offset-2');
+      currentTool = parseInt(button.getAttribute('data-tool'), 10);
+    });
+  });
+
+  // Canvas Mouse Controls
+  canvas.addEventListener('mousedown', handleDrawEvent);
+  canvas.addEventListener('mousemove', handleDrawEvent);
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+  // Map Reset Trigger
+  btnReset.addEventListener('click', () => {
+    grid = Array(COLS).fill(null).map(() => Array(ROWS).fill(0));
+    drawGrid();
+  });
+
+  // API Call: Run Simulation
+  btnSimulasi.addEventListener('click', async () => {
+    const payload = { hari: selectHari.value, jam: selectJam.value, peta: grid };
+    
+    try {
+      const response = await fetch('/api/simulasi', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      const result = await response.json();
+      
+      if (response.ok) {
+        drawGrid(); 
+        drawRoute(result.rute);
+      } else {
+        alert(`Error dari server: ${result.message}`);
+      }
+    } catch (error) {
+      console.error("Gagal terhubung ke server:", error);
+    }
+  });
+
+  // INITIALIZATION
+  drawGrid();
+</script>
+{% endblock %}

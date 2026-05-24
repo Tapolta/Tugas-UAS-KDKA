@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/* Membuat animasi kustom untuk Tailwind v4 */
+@utility animate-fade-in {
+  animation: fadeIn 0.5s ease-out forwards;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px); /* Ada efek sedikit bergeser naik yang elegan */
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
