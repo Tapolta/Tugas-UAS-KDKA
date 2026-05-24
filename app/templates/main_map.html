@@ -97,24 +97,21 @@
 </div>
 
 <script>
-  // --- CONFIGURATIONS & CONSTANTS ---
   const RESOLUTION = 20;
-  const ROUTE_COLOR = '#10b981'; // Emerald-500 untuk garis rute aktif
+  const ROUTE_COLOR = '#10b981';
 
-  // Single-source of truth untuk IDs, warna, dan tipe ubin map
   const TILE_CONFIG = {
-    0: { color: '#ffffff', isUnique: false }, // Jalan Kosong
-    1: { color: '#18181b', isUnique: false }, // Tembok (Zinc-900)
-    2: { color: '#f59e0b', isUnique: false }, // Pasar (Amber-500)
-    3: { color: '#6b7280', isUnique: false }, // Pemberhentian (Gray-500)
-    4: { color: '#f97316', isUnique: false }, // Event Pagi (Orange-500)
-    5: { color: '#ef4444', isUnique: false }, // Event Siang (Red-500)
-    6: { color: '#a855f7', isUnique: false }, // Event Sore (Purple-500)
-    7: { color: '#10b981', isUnique: true  }, // Titik Mulai (Emerald-500)
-    8: { color: '#3b82f6', isUnique: true  }  // Titik Selesai (Blue-500)
+    0: { color: '#ffffff', isUnique: false },
+    1: { color: '#18181b', isUnique: false },
+    2: { color: '#f59e0b', isUnique: false },
+    3: { color: '#6b7280', isUnique: false },
+    4: { color: '#f97316', isUnique: false },
+    5: { color: '#ef4444', isUnique: false },
+    6: { color: '#a855f7', isUnique: false },
+    7: { color: '#10b981', isUnique: true  },
+    8: { color: '#3b82f6', isUnique: true  }
   };
 
-  // --- DOM ELEMENTS ---
   const canvas = document.getElementById('simulasiCanvas');
   const ctx = canvas.getContext('2d');
   const btnReset = document.getElementById('btnReset');
@@ -126,11 +123,8 @@
   const COLS = canvas.width / RESOLUTION;
   const ROWS = canvas.height / RESOLUTION;
 
-  // --- APP STATE ---
   let grid = Array(COLS).fill(null).map(() => Array(ROWS).fill(0));
-  let currentTool = 7; // Default awal: Titik Mulai
-
-  // --- CORE FUNCTIONS ---
+  let currentTool = 7;
 
   function drawGrid() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -159,7 +153,6 @@
 
   function drawRoute(rute) {
     rute.forEach(([col, row]) => {
-      // Jangan timpa render visual Titik Mulai (7) dan Selesai (8)
       if (grid[col][row] !== 7 && grid[col][row] !== 8) {
         ctx.fillStyle = ROUTE_COLOR;
         ctx.fillRect(col * RESOLUTION + 4, row * RESOLUTION + 4, RESOLUTION - 8, RESOLUTION - 8);
@@ -173,21 +166,18 @@
     const row = Math.floor((e.clientY - rect.top) / RESOLUTION);
 
     if (col >= 0 && col < COLS && row >= 0 && row < ROWS) {
-      if (e.buttons === 1) { // Left click: Draw
+      if (e.buttons === 1) {
         if (TILE_CONFIG[currentTool]?.isUnique) {
           clearUniqueInstance(currentTool);
         }
         grid[col][row] = currentTool;
-      } else if (e.buttons === 2) { // Right click: Erase
+      } else if (e.buttons === 2) {
         grid[col][row] = 0;
       }
       drawGrid();
     }
   }
 
-  // --- EVENT LISTENERS ---
-
-  // UI: Tool Brush Selection Toggle
   toolButtons.forEach(button => {
     button.addEventListener('click', () => {
       toolButtons.forEach(btn => {
@@ -200,18 +190,15 @@
     });
   });
 
-  // Canvas Mouse Controls
   canvas.addEventListener('mousedown', handleDrawEvent);
   canvas.addEventListener('mousemove', handleDrawEvent);
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 
-  // Map Reset Trigger
   btnReset.addEventListener('click', () => {
     grid = Array(COLS).fill(null).map(() => Array(ROWS).fill(0));
     drawGrid();
   });
 
-  // API Call: Run Simulation
   btnSimulasi.addEventListener('click', async () => {
     const payload = { hari: selectHari.value, jam: selectJam.value, peta: grid };
     
@@ -235,7 +222,6 @@
     }
   });
 
-  // INITIALIZATION
   drawGrid();
 </script>
 {% endblock %}
