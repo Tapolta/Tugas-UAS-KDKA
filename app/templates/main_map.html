@@ -7,7 +7,7 @@
     <div class="flex flex-col gap-2 border-b border-zinc-100 pb-3 mb-4">
       <div>
         <h2 class="font-semibold text-zinc-900">Peta Simulasi Robot</h2>
-        <p class="text-xs text-zinc-500">Klik Kiri: Gambar Sesuai Kuas | Klik Kanan: Hapus (Jalan)</p>
+        <p class="text-xs text-zinc-500">Klik Kiri: Gambar Sesuai Kuas | Klik Kanan: Hapus (Jalan) | Ungu: Robot Fisik</p>
       </div>
     </div>
 
@@ -18,8 +18,8 @@
       Reset Peta
     </button>
 
-    <div class="flex-1 flex items-center justify-center bg-zinc-50 rounded-lg border border-dashed border-zinc-300 relative overflow-hidden">
-      <canvas id="simulasiCanvas" width="600" height="400" class="bg-white shadow-md rounded border border-zinc-200 cursor-crosshair"></canvas>
+    <div class="flex-1 flex items-center justify-center bg-zinc-100 rounded-lg border border-dashed border-zinc-300 relative overflow-hidden">
+      <canvas id="simulasiCanvas" width="600" height="400" class="bg-white shadow-md rounded border border-zinc-300 cursor-crosshair"></canvas>
     </div>
   </div>
 
@@ -88,9 +88,15 @@
       </div>
     </div>
 
-    <div class="pt-4 border-t border-zinc-100">
+    <div class="pt-4 border-t border-zinc-100 flex flex-col gap-2">
+      <button id="btnGenerate" class="w-full bg-zinc-800 hover:bg-zinc-900 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition flex items-center justify-center gap-2 text-sm">
+        Generate Jalan
+      </button>
       <button id="btnSimulasi" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition flex items-center justify-center gap-2 text-sm">
-        Mulai Simulasi
+        Mulai Simulasi Web
+      </button>
+      <button id="btnRobotFisik" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-4 rounded-lg shadow-sm transition flex items-center justify-center gap-2 text-sm">
+        <span class="h-2 w-2 rounded-full bg-white animate-pulse"></span> Kirim ke Robot Fisik
       </button>
     </div>
   </div>
@@ -98,24 +104,27 @@
 
 <script>
   const RESOLUTION = 20;
-  const ROUTE_COLOR = '#10b981';
+  const ROUTE_COLOR = '#06b6d4'; // Warna Rute (Cyan)
+  const PASSED_COLOR = '#e2e8f0'; // Warna jalan yang sudah dilewati robot fisik (Slate 200)
 
   const TILE_CONFIG = {
-    0: { color: '#ffffff', isUnique: false },
-    1: { color: '#18181b', isUnique: false },
-    2: { color: '#f59e0b', isUnique: false },
-    3: { color: '#6b7280', isUnique: false },
-    4: { color: '#f97316', isUnique: false },
-    5: { color: '#ef4444', isUnique: false },
-    6: { color: '#a855f7', isUnique: false },
-    7: { color: '#10b981', isUnique: true  },
-    8: { color: '#3b82f6', isUnique: true  }
+    0: { color: '#ffffff', isUnique: false }, 
+    1: { color: '#18181b', isUnique: false }, 
+    2: { color: '#f59e0b', isUnique: false }, 
+    3: { color: '#6b7280', isUnique: false }, 
+    4: { color: '#f97316', isUnique: false }, 
+    5: { color: '#ef4444', isUnique: false }, 
+    6: { color: '#a855f7', isUnique: false }, 
+    7: { color: '#10b981', isUnique: true  }, // Start
+    8: { color: '#3b82f6', isUnique: true  }  // Finish
   };
 
   const canvas = document.getElementById('simulasiCanvas');
   const ctx = canvas.getContext('2d');
   const btnReset = document.getElementById('btnReset');
+  const btnGenerate = document.getElementById('btnGenerate');
   const btnSimulasi = document.getElementById('btnSimulasi');
+  const btnRobotFisik = document.getElementById('btnRobotFisik');
   const toolButtons = document.querySelectorAll('.tool-btn');
   const selectHari = document.getElementById('selectHari');
   const selectJam = document.getElementById('selectJam');
@@ -126,6 +135,17 @@
   let grid = Array(COLS).fill(null).map(() => Array(ROWS).fill(0));
   let currentTool = 7;
 
+  // --- STATE ANIMASI SIMULASI WEB ---
+  let generatedRoute = [];     
+  let isSimulating = false;    
+  let simIndex = 0;            
+  const ROBOT_SPEED = 150; // Kecepatan gerak (ms)
+  let simulationInterval = null; // Variabel baru pengontrol animasi
+
+  // --- STATE BARU UNTUK MONITORING ROBOT FISIK ---
+  let physicalRobotPos = null; 
+  let jalanDilewati = [];      
+
   function drawGrid() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     for (let col = 0; col < COLS; col++) {
@@ -134,9 +154,15 @@
         ctx.rect(col * RESOLUTION, row * RESOLUTION, RESOLUTION, RESOLUTION);
         
         const tileType = grid[col][row];
-        ctx.fillStyle = TILE_CONFIG[tileType]?.color || '#ffffff';
-        ctx.fill();
+        const isPassed = jalanDilewati.some(([cx, rx]) => cx === col && rx === row);
         
+        if (isPassed && tileType !== 7 && tileType !== 8) {
+          ctx.fillStyle = PASSED_COLOR; 
+        } else {
+          ctx.fillStyle = TILE_CONFIG[tileType]?.color || '#ffffff';
+        }
+        
+        ctx.fill();
         ctx.strokeStyle = '#e4e4e7'; 
         ctx.stroke();
       }
@@ -160,7 +186,56 @@
     });
   }
 
+  function drawRobot(col, row) {
+    ctx.fillStyle = '#6366f1';    // Indigo 500
+    ctx.strokeStyle = '#4f46e5';  // Border warna
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    // Gambar robot kotak
+    ctx.rect(col * RESOLUTION + 3, row * RESOLUTION + 3, RESOLUTION - 6, RESOLUTION - 6);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  function drawPhysicalRobot() {
+    if (!physicalRobotPos) return;
+    const [col, row] = physicalRobotPos;
+    
+    ctx.fillStyle = '#a855f7';    
+    ctx.strokeStyle = '#7c3aed';  
+    ctx.lineWidth = 2;
+    
+    ctx.beginPath();
+    ctx.arc(col * RESOLUTION + RESOLUTION / 2, row * RESOLUTION + RESOLUTION / 2, RESOLUTION / 3, 0, 2 * Math.PI);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Polling Status Robot ESP32 (Hanya jalan saat tidak simulasi web)
+  async function cekStatusRobotFisik() {
+    if (isSimulating) return; 
+
+    try {
+      const response = await fetch('/api/robot/status');
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === "running") {
+          physicalRobotPos = data.posisi_sekarang;
+          jalanDilewati = data.jalan_dilewati;
+          
+          drawGrid();
+          drawRoute(generatedRoute);
+          drawPhysicalRobot();
+        }
+      }
+    } catch (error) {
+      console.error("Gagal polling ESP32:", error);
+    }
+  }
+  setInterval(cekStatusRobotFisik, 500);
+
   function handleDrawEvent(e) {
+    if (isSimulating) return; 
     const rect = canvas.getBoundingClientRect();
     const col = Math.floor((e.clientX - rect.left) / RESOLUTION);
     const row = Math.floor((e.clientY - rect.top) / RESOLUTION);
@@ -178,6 +253,7 @@
     }
   }
 
+  // --- KONTROL TOMBOL UI ---
   toolButtons.forEach(button => {
     button.addEventListener('click', () => {
       toolButtons.forEach(btn => {
@@ -195,11 +271,18 @@
   canvas.addEventListener('contextmenu', e => e.preventDefault());
 
   btnReset.addEventListener('click', () => {
+    isSimulating = false;
+    clearInterval(simulationInterval);
+    generatedRoute = [];
+    physicalRobotPos = null;
+    jalanDilewati = [];
     grid = Array(COLS).fill(null).map(() => Array(ROWS).fill(0));
     drawGrid();
   });
 
-  btnSimulasi.addEventListener('click', async () => {
+  btnGenerate.addEventListener('click', async () => {
+    isSimulating = false;      
+    clearInterval(simulationInterval);
     const payload = { hari: selectHari.value, jam: selectJam.value, peta: grid };
     
     try {
@@ -212,8 +295,9 @@
       const result = await response.json();
       
       if (response.ok) {
+        generatedRoute = result.rute; 
         drawGrid(); 
-        drawRoute(result.rute);
+        drawRoute(generatedRoute);
       } else {
         alert(`Error dari server: ${result.message}`);
       }
@@ -222,6 +306,74 @@
     }
   });
 
+  // --- LOGIKA ANIMASI YANG SUDAH DIPERBAIKI (MENGGUNAKAN SETINTERVAL) ---
+  btnSimulasi.addEventListener('click', () => {
+    if (!generatedRoute || generatedRoute.length === 0) {
+      alert("Silakan klik 'Generate Jalan' terlebih dahulu sebelum memulai simulasi!");
+      return;
+    }
+    
+    if (isSimulating) return; // Mencegah klik berulang saat animasi jalan
+
+    console.log("Animasi web dimulai...");
+    isSimulating = true;
+    simIndex = 0;
+
+    // Bersihkan interval lama jika ada
+    if (simulationInterval) clearInterval(simulationInterval);
+
+    // Jalankan pergerakan robot setiap ROBOT_SPEED (150ms)
+    simulationInterval = setInterval(() => {
+      // 1. Cek apakah robot sudah di tujuan
+      if (simIndex >= generatedRoute.length) {
+        clearInterval(simulationInterval);
+        isSimulating = false;
+        
+        // Render final map agar bersih
+        drawGrid();
+        drawRoute(generatedRoute);
+        alert("Simulasi Selesai! Kotak robot telah mencapai tujuan.");
+        return;
+      }
+
+      // 2. Render Peta dan Rute Biru
+      drawGrid();
+      drawRoute(generatedRoute);
+
+      // 3. Render Robot Ungu/Indigo di posisinya saat ini
+      const [currCol, currRow] = generatedRoute[simIndex];
+      drawRobot(currCol, currRow);
+
+      // 4. Lanjut ke langkah selanjutnya
+      simIndex++;
+    }, ROBOT_SPEED);
+  });
+
+  btnRobotFisik.addEventListener('click', async () => {
+    if (!generatedRoute || generatedRoute.length === 0) {
+      alert("Silakan klik 'Generate Jalan' terlebih dahulu sebelum mengirim rute!");
+      return;
+    }
+
+    try {
+      const response = await fetch('/api/robot/siapkan-rute', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rute: generatedRoute })
+      });
+
+      if (response.ok) {
+        alert("Rute berhasil diunggah! Silakan nyalakan ESP32 Robot Fisik Anda.");
+      } else {
+        const errorData = await response.json();
+        alert(`Gagal mengunggah rute: ${errorData.message}`);
+      }
+    } catch (error) {
+      console.error("Koneksi gagal saat unggah rute:", error);
+    }
+  });
+
+  // Render awal canvas saat halaman dimuat
   drawGrid();
 </script>
 {% endblock %}
