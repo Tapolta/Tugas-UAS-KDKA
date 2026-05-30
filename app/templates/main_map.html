@@ -31,6 +31,16 @@
       </div>
 
       <div class="space-y-4">
+        
+        <div>
+          <label class="block text-xs font-semibold text-zinc-600 uppercase tracking-wider mb-1.5">Pilih Algoritma</label>
+          <select id="selectAlgoritma" class="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
+            <option value="astar">Weighted A* (Prioritas & Bobot)</option>
+            <option value="bfs">BFS (Langkah Terpendek)</option>
+            <option value="dfs">DFS (Eksplorasi Terdalam)</option>
+          </select>
+        </div>
+
         <div>
           <label class="block text-xs font-semibold text-zinc-600 uppercase tracking-wider mb-1.5">Pilih Hari</label>
           <select id="selectHari" class="w-full rounded-lg border border-zinc-300 bg-zinc-50 px-3 py-2 text-sm focus:border-indigo-500 focus:outline-none">
@@ -104,9 +114,8 @@
 
 <script>
   const RESOLUTION = 20;
-  const ROUTE_COLOR = '#06b6d4'; // Warna Rute (Cyan)
-  const PASSED_COLOR = '#e2e8f0'; // Warna jalan yang sudah dilewati robot fisik (Slate 200)
-
+  const ROUTE_COLOR = '#06b6d4';
+  const PASSED_COLOR = '#e2e8f0';
   const TILE_CONFIG = {
     0: { color: '#ffffff', isUnique: false }, 
     1: { color: '#18181b', isUnique: false }, 
@@ -115,8 +124,8 @@
     4: { color: '#f97316', isUnique: false }, 
     5: { color: '#ef4444', isUnique: false }, 
     6: { color: '#a855f7', isUnique: false }, 
-    7: { color: '#10b981', isUnique: true  }, // Start
-    8: { color: '#3b82f6', isUnique: true  }  // Finish
+    7: { color: '#10b981', isUnique: true  },
+    8: { color: '#3b82f6', isUnique: true  }
   };
 
   const canvas = document.getElementById('simulasiCanvas');
@@ -128,6 +137,8 @@
   const toolButtons = document.querySelectorAll('.tool-btn');
   const selectHari = document.getElementById('selectHari');
   const selectJam = document.getElementById('selectJam');
+  
+  const selectAlgoritma = document.getElementById('selectAlgoritma');
 
   const COLS = canvas.width / RESOLUTION;
   const ROWS = canvas.height / RESOLUTION;
@@ -135,14 +146,12 @@
   let grid = Array(COLS).fill(null).map(() => Array(ROWS).fill(0));
   let currentTool = 7;
 
-  // --- STATE ANIMASI SIMULASI WEB ---
   let generatedRoute = [];     
   let isSimulating = false;    
   let simIndex = 0;            
-  const ROBOT_SPEED = 150; // Kecepatan gerak (ms)
-  let simulationInterval = null; // Variabel baru pengontrol animasi
+  const ROBOT_SPEED = 150;
+  let simulationInterval = null; 
 
-  // --- STATE BARU UNTUK MONITORING ROBOT FISIK ---
   let physicalRobotPos = null; 
   let jalanDilewati = [];      
 
@@ -187,11 +196,10 @@
   }
 
   function drawRobot(col, row) {
-    ctx.fillStyle = '#6366f1';    // Indigo 500
-    ctx.strokeStyle = '#4f46e5';  // Border warna
+    ctx.fillStyle = '#6366f1';
+    ctx.strokeStyle = '#4f46e5';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    // Gambar robot kotak
     ctx.rect(col * RESOLUTION + 3, row * RESOLUTION + 3, RESOLUTION - 6, RESOLUTION - 6);
     ctx.fill();
     ctx.stroke();
@@ -211,7 +219,6 @@
     ctx.stroke();
   }
 
-  // Polling Status Robot ESP32 (Hanya jalan saat tidak simulasi web)
   async function cekStatusRobotFisik() {
     if (isSimulating) return; 
 
@@ -253,7 +260,6 @@
     }
   }
 
-  // --- KONTROL TOMBOL UI ---
   toolButtons.forEach(button => {
     button.addEventListener('click', () => {
       toolButtons.forEach(btn => {
@@ -283,7 +289,13 @@
   btnGenerate.addEventListener('click', async () => {
     isSimulating = false;      
     clearInterval(simulationInterval);
-    const payload = { hari: selectHari.value, jam: selectJam.value, peta: grid };
+    
+    const payload = { 
+        hari: selectHari.value, 
+        jam: selectJam.value, 
+        peta: grid,
+        algoritma: selectAlgoritma.value
+    };
     
     try {
       const response = await fetch('/api/simulasi', {
@@ -298,6 +310,7 @@
         generatedRoute = result.rute; 
         drawGrid(); 
         drawRoute(generatedRoute);
+        console.log(`Jalur berhasil dibuat menggunakan algoritma: ${result.algoritma_digunakan}`);
       } else {
         alert(`Error dari server: ${result.message}`);
       }
@@ -306,45 +319,37 @@
     }
   });
 
-  // --- LOGIKA ANIMASI YANG SUDAH DIPERBAIKI (MENGGUNAKAN SETINTERVAL) ---
   btnSimulasi.addEventListener('click', () => {
     if (!generatedRoute || generatedRoute.length === 0) {
       alert("Silakan klik 'Generate Jalan' terlebih dahulu sebelum memulai simulasi!");
       return;
     }
     
-    if (isSimulating) return; // Mencegah klik berulang saat animasi jalan
+    if (isSimulating) return; 
 
     console.log("Animasi web dimulai...");
     isSimulating = true;
     simIndex = 0;
 
-    // Bersihkan interval lama jika ada
     if (simulationInterval) clearInterval(simulationInterval);
 
-    // Jalankan pergerakan robot setiap ROBOT_SPEED (150ms)
     simulationInterval = setInterval(() => {
-      // 1. Cek apakah robot sudah di tujuan
       if (simIndex >= generatedRoute.length) {
         clearInterval(simulationInterval);
         isSimulating = false;
         
-        // Render final map agar bersih
         drawGrid();
         drawRoute(generatedRoute);
         alert("Simulasi Selesai! Kotak robot telah mencapai tujuan.");
         return;
       }
 
-      // 2. Render Peta dan Rute Biru
       drawGrid();
       drawRoute(generatedRoute);
 
-      // 3. Render Robot Ungu/Indigo di posisinya saat ini
       const [currCol, currRow] = generatedRoute[simIndex];
       drawRobot(currCol, currRow);
 
-      // 4. Lanjut ke langkah selanjutnya
       simIndex++;
     }, ROBOT_SPEED);
   });
@@ -373,7 +378,6 @@
     }
   });
 
-  // Render awal canvas saat halaman dimuat
   drawGrid();
 </script>
 {% endblock %}

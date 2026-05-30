@@ -3,13 +3,11 @@ from app.services.router_service import RouterService
 
 simulation_bp = Blueprint('simulation', __name__)
 
-# --- STATE MEMORI SEMENTARA UNTUK ROBOT FISIK ---
-# Catatan: Pada aplikasi produksi, data ini idealnya disimpan di database/Redis
 robot_physical_state = {
-    "status": "idle",          # "idle" atau "running"
-    "rute_penuh": [],          # Menyimpan koordinat rute aktif [[x,y], [x,y], ...]
-    "posisi_sekarang": None,   # Koordinat [x, y] saat ini
-    "jalan_dilewati": []       # Koordinat rute yang sudah berhasil dibersihkan/dilewati
+    "status": "idle",          
+    "rute_penuh": [],          
+    "posisi_sekarang": None,
+    "jalan_dilewati": []
 }
 
 @simulation_bp.route('/')
@@ -20,7 +18,6 @@ def landing():
 def main_map():
     return render_template('main_map.html')
 
-# 1. API GENERATE RUTE SIMULASI WEB (Kode Asli Kamu)
 @simulation_bp.route('/api/simulasi', methods=['POST'])
 def simulasi_rute():
     data = request.get_json()
@@ -30,6 +27,8 @@ def simulasi_rute():
     hari = data.get('hari')
     jam = data.get('jam')
     peta = data.get('peta') 
+    
+    algoritma_pilihan = data.get('algoritma', 'astar').lower()
     
     if not all([hari, jam, peta]):
         return jsonify({"status": "error", "message": "Parameter tidak lengkap."}), 400
@@ -52,6 +51,15 @@ def simulasi_rute():
 
     try:
         active_weights = RouterService.get_obstacle_weights(hari, jam)
+        
+        def get_calculated_path(start_node, goal_node):
+            if algoritma_pilihan == 'bfs':
+                return RouterService.find_path_bfs(peta, start_node, goal_node)
+            elif algoritma_pilihan == 'dfs':
+                return RouterService.find_path_dfs(peta, start_node, goal_node)
+            else:
+                return RouterService.find_path_weighted_astar(peta, start_node, goal_node, active_weights)
+
         rute_penuh = []
         posisi_sekarang = titik_mulai
 
@@ -61,7 +69,8 @@ def simulasi_rute():
             rute_terpilih = []
             
             for stasiun in daftar_pemberhentian:
-                rute_uji = RouterService.find_shortest_path(peta, posisi_sekarang, stasiun, active_weights)
+                rute_uji = get_calculated_path(posisi_sekarang, stasiun)
+                
                 if rute_uji and len(rute_uji) < jarak_terpendek:
                     jarak_terpendek = len(rute_uji)
                     terdekat = stasiun
@@ -78,7 +87,8 @@ def simulasi_rute():
             posisi_sekarang = terdekat
             daftar_pemberhentian.remove(terdekat)
 
-        rute_ke_finish = RouterService.find_shortest_path(peta, posisi_sekarang, titik_selesai, active_weights)
+        rute_ke_finish = get_calculated_path(posisi_sekarang, titik_selesai)
+        
         if not rute_ke_finish:
             return jsonify({"status": "error", "message": "Rute menuju titik selesai terblokir!"}), 422
             
@@ -87,57 +97,87 @@ def simulasi_rute():
         else:
             rute_penuh.extend(rute_ke_finish)
 
-        return jsonify({"status": "success", "rute": rute_penuh}), 200
+        return jsonify({
+            "status": "success", 
+            "rute": rute_penuh,
+            "algoritma_digunakan": algoritma_pilihan
+        }), 200
 
     except Exception as e:
         return jsonify({"status": "error", "message": f"Kegagalan sistem internal: {str(e)}"}), 500
-
-
-# 2. API BARU: MENERIMA/MENYIAPKAN RUTE UNTUK ROBOT FISIK
+    
 @simulation_bp.route('/api/robot/siapkan-rute', methods=['POST'])
-def siapkan_rute_fisik():
+def siapkan_rute():
     data = request.get_json()
-    if not data or 'rute' not in data:
-        return jsonify({"status": "error", "message": "Data rute tidak ditemukan."}), 400
     
-    rute = data.get('rute')
-    if not rute or len(rute) == 0:
-        return jsonify({"status": "error", "message": "Rute kosong."}), 400
+    if not data:
+        return jsonify({"status": "error", "message": "Data JSON tidak ditemukan."}), 400
         
-    # Reset dan set state robot fisik ke posisi awal rute
-    robot_physical_state["rute_penuh"] = rute
-    robot_physical_state["posisi_sekarang"] = rute[0]
-    robot_physical_state["jalan_dilewati"] = [rute[0]]
-    robot_physical_state["status"] = "running" # Otomatis aktif/bisa di-fetch ESP32
+    rute_diterima = data.get('rute')
     
-    return jsonify({"status": "success", "message": "Rute berhasil diunggah ke server backend!"}), 200
+    if not rute_diterima or not isinstance(rute_diterima, list) or len(rute_diterima) == 0:
+        return jsonify({"status": "error", "message": "Data rute tidak valid atau kosong."}), 400
 
-
-# 3. API BARU: POLLING STATUS UNTUK CANVAS JAVASCRIPT FRONTEND
+    try:
+        global robot_physical_state
+        
+        robot_physical_state["rute_penuh"] = rute_diterima
+        robot_physical_state["posisi_sekarang"] = rute_diterima[0]
+        robot_physical_state["jalan_dilewati"] = []
+        robot_physical_state["status"] = "ready"
+        
+        return jsonify({
+            "status": "success", 
+            "message": "Rute berhasil disimpan dan siap dieksekusi oleh robot fisik."
+        }), 200
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error", 
+            "message": f"Gagal menyiapkan rute: {str(e)}"
+        }), 500
+    
 @simulation_bp.route('/api/robot/status', methods=['GET'])
-def ambil_status_robot():
-    # Mengembalikan koordinat aktual robot fisik agar digambar sebagai lingkaran ungu di web
-    return jsonify({
-        "status": robot_physical_state["status"],
-        "posisi_sekarang": robot_physical_state["posisi_sekarang"],
-        "jalan_dilewati": robot_physical_state["jalan_dilewati"]
-    }), 200
+def status():
+    try:
+        global robot_physical_state
+        
+        return jsonify(robot_physical_state), 200
+        
+    except Exception as e:
+        return jsonify({
+            "status": "error", 
+            "message": f"Gagal mengambil status robot: {str(e)}"
+        }), 500
 
 
-# 4. API TAMBAHAN (OPSIONAL): UNTUK ESP32/HARDWARE UPDATE KOORDINATNYA
-@simulation_bp.route('/api/robot/update-posisi', methods=['POST'])
-def update_posisi_dari_hardware():
+@simulation_bp.route('/api/robot/update', methods=['POST'])
+def update_robot():
     data = request.get_json()
-    posisi = data.get('posisi') # Kirim format [col, row] dari ESP32
     
-    if posisi:
-        robot_physical_state["posisi_sekarang"] = posisi
-        if posisi not in robot_physical_state["jalan_dilewati"]:
-            robot_physical_state["jalan_dilewati"].append(posisi)
+    if not data:
+        return jsonify({"status": "error", "message": "Data JSON tidak ditemukan."}), 400
+
+    try:
+        global robot_physical_state
+        
+        if 'status' in data:
+            robot_physical_state['status'] = data['status']
             
-        # Jika koordinat saat ini sudah menyentuh titik koordinat terakhir rute
-        if posisi == robot_physical_state["rute_penuh"][-1]:
-            robot_physical_state["status"] = "idle"
+        if 'posisi_sekarang' in data:
+            posisi_baru = data['posisi_sekarang']
             
-        return jsonify({"status": "success"}), 200
-    return jsonify({"status": "error", "message": "Koordinat tidak valid"}), 400
+            if isinstance(posisi_baru, list) and len(posisi_baru) == 2:
+                if robot_physical_state['posisi_sekarang'] is not None:
+                    if robot_physical_state['posisi_sekarang'] != posisi_baru:
+                        robot_physical_state['jalan_dilewati'].append(robot_physical_state['posisi_sekarang'])
+                
+                robot_physical_state['posisi_sekarang'] = posisi_baru
+
+        if robot_physical_state['status'] == 'idle':
+            robot_physical_state['rute_penuh'] = []
+            
+        return jsonify({"status": "success", "message": "State robot berhasil diperbarui."}), 200
+
+    except Exception as e:
+        return jsonify({"status": "error", "message": f"Gagal memperbarui state: {str(e)}"}), 500
