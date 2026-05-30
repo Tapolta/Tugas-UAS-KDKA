@@ -180,4 +180,4 @@ def update_robot():
         return jsonify({"status": "success", "message": "State robot berhasil diperbarui."}), 200
 
     except Exception as e:
-        return jsonify({"status": "error", "message": f"Gagal memperbarui state: {str(e)}"}), 500
+        return jsonify({"status": "error", "message": f"Gagal memperbarui state: {str(e)}"}), 500 
